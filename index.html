@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simonel — Volume 1</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #ccc;
+            overflow: hidden;
+        }
+
+        .flipbook-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .book {
+            position: relative;
+            perspective: 2000px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .spread {
+            display: flex;
+            gap: 0;
+            box-shadow: 0 20px 80px rgba(0,0,0,0.6);
+        }
+
+        .spread img {
+            height: 85vh;
+            width: auto;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        /* Single page mode (cover, back) */
+        .spread.single {
+            justify-content: center;
+        }
+
+        /* Navigation arrows */
+        .nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+            font-size: 28px;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, opacity 0.2s;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.18); }
+        .nav-btn:disabled { opacity: 0.2; cursor: default; }
+        .nav-btn.prev { left: 20px; }
+        .nav-btn.next { right: 20px; }
+
+        /* Page indicator */
+        .page-indicator {
+            position: absolute;
+            bottom: 20px;
+            font-size: 14px;
+            color: rgba(255,255,255,0.5);
+            letter-spacing: 1px;
+        }
+
+        /* Loading state */
+        .loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a1a;
+            z-index: 100;
+            font-size: 16px;
+            color: #888;
+        }
+        .loading.hidden { display: none; }
+
+        /* Flip animation */
+        .spread {
+            transition: opacity 0.25s ease;
+        }
+        .spread.flipping {
+            opacity: 0;
+        }
+
+        /* Mobile: stack pages vertically */
+        @media (max-width: 900px) {
+            .spread { flex-direction: column; }
+            .spread img { height: auto; width: 92vw; }
+        }
+    </style>
+</head>
+<body>
+    <div class="flipbook-container">
+        <div class="loading" id="loading">Loading magazine...</div>
+        <button class="nav-btn prev" id="prevBtn" onclick="prevPage()" disabled>&#8249;</button>
+        <div class="book">
+            <div class="spread" id="spread"></div>
+        </div>
+        <button class="nav-btn next" id="nextBtn" onclick="nextPage()">&#8250;</button>
+        <div class="page-indicator" id="pageIndicator"></div>
+    </div>
+
+    <script>
+        const TOTAL_PAGES = 61;
+        let currentSpread = 0;
+        let spreads = [];
+        let preloaded = {};
+
+        // Build spread layout: cover single, then pairs, back single if odd
+        function buildSpreads() {
+            // Page 1 = cover (single)
+            spreads.push([1]);
+            // Pages 2-3, 4-5, ... as pairs
+            for (let i = 2; i <= TOTAL_PAGES; i += 2) {
+                if (i + 1 <= TOTAL_PAGES) {
+                    spreads.push([i, i + 1]);
+                } else {
+                    spreads.push([i]); // last page single if odd total
+                }
+            }
+        }
+
+        function pagePath(n) {
+            return `pages/page-${String(n).padStart(2, '0')}.jpg`;
+        }
+
+        function preloadSpread(idx) {
+            if (idx < 0 || idx >= spreads.length) return;
+            spreads[idx].forEach(p => {
+                if (!preloaded[p]) {
+                    const img = new Image();
+                    img.src = pagePath(p);
+                    preloaded[p] = img;
+                }
+            });
+        }
+
+        function renderSpread() {
+            const spread = document.getElementById('spread');
+            const pages = spreads[currentSpread];
+
+            spread.classList.add('flipping');
+
+            setTimeout(() => {
+                spread.innerHTML = '';
+                spread.className = pages.length === 1 ? 'spread single' : 'spread';
+
+                pages.forEach(p => {
+                    const img = document.createElement('img');
+                    img.src = pagePath(p);
+                    img.alt = `Page ${p}`;
+                    img.draggable = false;
+                    spread.appendChild(img);
+                });
+
+                spread.classList.remove('flipping');
+            }, 150);
+
+            // Update controls
+            document.getElementById('prevBtn').disabled = currentSpread === 0;
+            document.getElementById('nextBtn').disabled = currentSpread === spreads.length - 1;
+
+            const pages_shown = pages.length === 1
+                ? `Page ${pages[0]}`
+                : `Pages ${pages[0]}–${pages[1]}`;
+            document.getElementById('pageIndicator').textContent =
+                `${pages_shown} of ${TOTAL_PAGES}`;
+
+            // Preload adjacent spreads
+            preloadSpread(currentSpread + 1);
+            preloadSpread(currentSpread + 2);
+            preloadSpread(currentSpread - 1);
+        }
+
+        function nextPage() {
+            if (currentSpread < spreads.length - 1) {
+                currentSpread++;
+                renderSpread();
+            }
+        }
+
+        function prevPage() {
+            if (currentSpread > 0) {
+                currentSpread--;
+                renderSpread();
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextPage(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevPage(); }
+            if (e.key === 'Home') { currentSpread = 0; renderSpread(); }
+            if (e.key === 'End') { currentSpread = spreads.length - 1; renderSpread(); }
+        });
+
+        // Touch/swipe support
+        let touchStartX = 0;
+        document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+        document.addEventListener('touchend', (e) => {
+            const dx = e.changedTouches[0].clientX - touchStartX;
+            if (Math.abs(dx) > 50) {
+                if (dx < 0) nextPage();
+                else prevPage();
+            }
+        });
+
+        // Init
+        buildSpreads();
+        // Preload first few spreads then show
+        const firstImages = spreads[0].concat(spreads[1] || []);
+        let loaded = 0;
+        firstImages.forEach(p => {
+            const img = new Image();
+            img.onload = () => {
+                loaded++;
+                preloaded[p] = img;
+                if (loaded === firstImages.length) {
+                    document.getElementById('loading').classList.add('hidden');
+                    renderSpread();
+                }
+            };
+            img.src = pagePath(p);
+        });
+        // Preload a few more
+        preloadSpread(2);
+        preloadSpread(3);
+    </script>
+</body>
+</html>
