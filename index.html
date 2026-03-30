@@ -43,16 +43,13 @@
         }
 
         .spread img {
-            height: 85vh;
+            max-height: 90vh;
+            max-width: 90vw;
             width: auto;
+            height: auto;
             display: block;
             user-select: none;
             -webkit-user-drag: none;
-        }
-
-        /* Single page mode (cover, back) */
-        .spread.single {
-            justify-content: center;
         }
 
         /* Navigation arrows */
@@ -111,10 +108,9 @@
             opacity: 0;
         }
 
-        /* Mobile: stack pages vertically */
+        /* Mobile */
         @media (max-width: 900px) {
-            .spread { flex-direction: column; }
-            .spread img { height: auto; width: 92vw; }
+            .spread img { max-width: 96vw; max-height: 85vh; }
         }
     </style>
 </head>
@@ -135,17 +131,12 @@
         let spreads = [];
         let preloaded = {};
 
-        // Build spread layout: cover single, then pairs, back single if odd
+        // Build spread layout: each PDF page is shown individually
+        // Page 1 is a single-page cover (825px wide)
+        // Pages 2-61 are pre-composed two-page spreads (1650px wide)
         function buildSpreads() {
-            // Page 1 = cover (single)
-            spreads.push([1]);
-            // Pages 2-3, 4-5, ... as pairs
-            for (let i = 2; i <= TOTAL_PAGES; i += 2) {
-                if (i + 1 <= TOTAL_PAGES) {
-                    spreads.push([i, i + 1]);
-                } else {
-                    spreads.push([i]); // last page single if odd total
-                }
+            for (let i = 1; i <= TOTAL_PAGES; i++) {
+                spreads.push([i]);
             }
         }
 
@@ -172,7 +163,7 @@
 
             setTimeout(() => {
                 spread.innerHTML = '';
-                spread.className = pages.length === 1 ? 'spread single' : 'spread';
+                spread.className = 'spread';
 
                 pages.forEach(p => {
                     const img = document.createElement('img');
@@ -189,11 +180,8 @@
             document.getElementById('prevBtn').disabled = currentSpread === 0;
             document.getElementById('nextBtn').disabled = currentSpread === spreads.length - 1;
 
-            const pages_shown = pages.length === 1
-                ? `Page ${pages[0]}`
-                : `Pages ${pages[0]}–${pages[1]}`;
             document.getElementById('pageIndicator').textContent =
-                `${pages_shown} of ${TOTAL_PAGES}`;
+                `${currentSpread + 1} of ${TOTAL_PAGES}`;
 
             // Preload adjacent spreads
             preloadSpread(currentSpread + 1);
